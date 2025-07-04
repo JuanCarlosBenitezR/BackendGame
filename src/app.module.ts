@@ -14,6 +14,7 @@ import { envs } from './config/envs';
       password: envs.DATABASE_PASSWORD,
       database: envs.DATABASE_NAME,
       autoLoadModels: true,
+      //sync: { force: true },
       synchronize: true,
       dialectOptions: {
         ssl: {

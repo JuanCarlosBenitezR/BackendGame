@@ -28,7 +28,7 @@ export class Game extends Model {
 
   @Column({
     type: DataType.JSONB,
-    defaultValue: {},
+    allowNull: true,
   })
   score: Record<string, number>;
 }

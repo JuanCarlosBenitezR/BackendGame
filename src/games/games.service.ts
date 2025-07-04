@@ -4,7 +4,7 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
-import { CreateGameDto } from './dto/create-game.dto';
+import { CreateGameDto, GameState } from './dto/create-game.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
 import { InjectModel } from '@nestjs/sequelize';
 import { Game } from './entities/game.entity';
@@ -19,11 +19,11 @@ export class GamesService {
 
   async create(createGameDto: CreateGameDto) {
     try {
-      const { name, maxPlayers, players, state } = createGameDto;
+      const { name, maxPlayers, playerName, state } = createGameDto;
       const newGame = await this.gameModel.create({
         name: name,
         maxPlayers: maxPlayers,
-        players: players || [],
+        players: [playerName!],
         state: state || 'waiting',
         score: null,
       });
@@ -46,8 +46,63 @@ export class GamesService {
     return game;
   }
 
-  update(id: number, updateGameDto: UpdateGameDto) {
-    return `This action updates a #${id} game`;
+  async joinGame(id: number, updateGameDto: UpdateGameDto) {
+    const { playerName } = updateGameDto;
+    const game = await this.findOne(id);
+    if (game.dataValues.players.includes(playerName!)) {
+      throw new BadRequestException(
+        `Player ${playerName} is already in the game`,
+      );
+    }
+    const newPlayers = [...game.dataValues.players, playerName];
+    if (newPlayers.length > game.dataValues.maxPlayers) {
+      throw new BadRequestException('Game is full');
+    }
+    try {
+      await game.update({
+        players: newPlayers,
+      });
+      return {
+        message: 'Joined succesfully',
+      };
+    } catch (error) {
+      this.handleDBException(error);
+    }
+  }
+
+  async startGame(id: number, updateGameDto: UpdateGameDto) {
+    const game = await this.findOne(id);
+    // if (game.dataValues.state !== 'waiting') {
+    //   throw new BadRequestException('Game is already in progress or finished');
+    // }
+    try {
+      await game.update({
+        state: GameState.IN_PROGRESS,
+      });
+      return {
+        message: 'Game started successfully',
+      };
+    } catch (error) {
+      this.handleDBException(error);
+    }
+  }
+
+  async endGame(id: number, updateGameDto: UpdateGameDto) {
+    const game = await this.findOne(id);
+    // if (game.dataValues.state !== 'waiting') {
+    //   throw new BadRequestException('Game is already in progress or finished');
+    // }
+    try {
+      await game.update({
+        score: updateGameDto.score,
+        state: GameState.FINISHED,
+      });
+      return {
+        message: 'Game ended successfully',
+      };
+    } catch (error) {
+      this.handleDBException(error);
+    }
   }
 
   private handleDBException(error: any) {
