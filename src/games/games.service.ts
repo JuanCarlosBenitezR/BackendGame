@@ -3,6 +3,7 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { CreateGameDto, GameState } from './dto/create-game.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
@@ -41,7 +42,8 @@ export class GamesService {
       },
     });
     if (!game) {
-      throw new BadRequestException(`Game with id ${id} not found`);
+      throw new NotFoundException(`Game with id ${id} not found`);
+      // throw new BadRequestException(`Game with id ${id} not found`);
     }
     return game;
   }
