@@ -9,6 +9,8 @@ import { CreateGameDto, GameState } from './dto/create-game.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
 import { InjectModel } from '@nestjs/sequelize';
 import { Game } from './entities/game.entity';
+import { User } from 'src/users/entities/user.entity';
+import { UsersService } from 'src/users/users.service';
 @Injectable()
 export class GamesService {
   private readonly logger = new Logger('GamesService');
@@ -16,19 +18,22 @@ export class GamesService {
   constructor(
     @InjectModel(Game)
     private gameModel: typeof Game,
+    private readonly userService: UsersService,
   ) {}
 
   async create(createGameDto: CreateGameDto) {
+    const { name, maxPlayers, userId, state } = createGameDto;
     try {
-      const { name, maxPlayers, playerName, state } = createGameDto;
       const newGame = await this.gameModel.create({
         name: name,
         maxPlayers: maxPlayers,
-        players: [playerName!],
         state: state || 'waiting',
         score: null,
       });
-
+      if (userId) {
+        const user = await this.userService.findOne(userId);
+        await newGame.$add('players', user);
+      }
       return newGame;
     } catch (error) {
       this.handleDBException(error);
@@ -40,6 +45,16 @@ export class GamesService {
       where: {
         id: id,
       },
+      include: [
+        {
+          model: User,
+          as: 'players',
+          attributes: ['id', 'fullname', 'email'],
+          through: {
+            attributes: [],
+          },
+        },
+      ],
     });
     if (!game) {
       throw new NotFoundException(`Game with id ${id} not found`);
@@ -49,27 +64,29 @@ export class GamesService {
   }
 
   async joinGame(id: number, updateGameDto: UpdateGameDto) {
-    const { playerName } = updateGameDto;
-    const game = await this.findOne(id);
-    if (game.dataValues.players.includes(playerName!)) {
-      throw new BadRequestException(
-        `Player ${playerName} is already in the game`,
-      );
+    const { userId } = updateGameDto;
+    if (!userId) {
+      throw new BadRequestException('User ID is required to join the game');
     }
-    const newPlayers = [...game.dataValues.players, playerName];
-    if (newPlayers.length > game.dataValues.maxPlayers) {
+    const game = await this.findOne(id);
+    if (game.dataValues.state !== GameState.WAITING) {
+      throw new BadRequestException('Game is not joinable');
+    }
+    const user = await this.userService.findOne(userId);
+
+    const alreadyJoined = game.dataValues.players.find(
+      (player) => player.id === userId,
+    );
+    if (alreadyJoined) {
+      throw new BadRequestException('User is already in the game');
+    }
+    if (game.dataValues.players.length >= game.dataValues.maxPlayers) {
       throw new BadRequestException('Game is full');
     }
-    try {
-      await game.update({
-        players: newPlayers,
-      });
-      return {
-        message: 'Joined succesfully',
-      };
-    } catch (error) {
-      this.handleDBException(error);
-    }
+    await game.$add('players', user);
+    return {
+      message: 'User joined the game successfully',
+    };
   }
 
   async startGame(id: number, updateGameDto: UpdateGameDto) {

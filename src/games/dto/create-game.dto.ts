@@ -23,9 +23,9 @@ export class CreateGameDto {
   @Min(2)
   maxPlayers: number;
 
-  @IsString()
+  @IsInt()
   @IsOptional()
-  playerName?: string;
+  userId?: number;
 
   @IsEnum(GameState)
   @IsOptional()
