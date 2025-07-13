@@ -124,6 +124,32 @@ export class GamesService {
     }
   }
 
+  async findAll(status: string = 'waiting') {
+    if (
+      status !== 'waiting' &&
+      status !== 'in_progress' &&
+      status !== 'finished'
+    ) {
+      throw new BadRequestException('Invalid game status');
+    }
+    const games = await this.gameModel.findAll({
+      where: {
+        state: status,
+      },
+      include: [
+        {
+          model: User,
+          as: 'players',
+          attributes: ['id', 'fullname', 'email'],
+          through: {
+            attributes: [],
+          },
+        },
+      ],
+    });
+    return games;
+  }
+
   private handleDBException(error: any) {
     if (error.parent.code === '23505') {
       throw new BadRequestException(error.parent.detail);
