@@ -64,9 +64,18 @@ export class UsersService {
     return user;
   }
 
-  // update(id: number, updateUserDto: UpdateUserDto) {
-  //   return `This action updates a #${id} user`;
-  // }
+  async update(id: number, updateUserDto: UpdateUserDto) {
+    const user = await this.findOne(id);
+    if (!user) {
+      throw new NotFoundException(`User with id ${id} not found`);
+    }
+    try {
+      return user.update(updateUserDto);
+    } catch (error) {
+      this.handleDBException(error);
+    }
+    return `This action updates a #${id} user`;
+  }
 
   async remove(id: number) {
     const user = await this.findOne(id);
