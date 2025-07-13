@@ -56,6 +56,7 @@ export class UsersService {
         id: id,
       },
     });
+
     if (!user) {
       throw new NotFoundException(`User with id ${id} not found`);
       // throw new BadRequestException(`User with id ${id} not found`);
@@ -67,9 +68,21 @@ export class UsersService {
   //   return `This action updates a #${id} user`;
   // }
 
-  // remove(id: number) {
-  //   return `This action removes a #${id} user`;
-  // }
+  async remove(id: number) {
+    const user = await this.findOne(id);
+
+    if (!user) {
+      throw new NotFoundException(`User with id ${id} not found`);
+    }
+    try {
+      await user.update({
+        isActive: false,
+      });
+      return `The user #${id} has been desactivated`;
+    } catch (error) {
+      this.handleDBException(error);
+    }
+  }
 
   private handleDBException(error: any) {
     if (error.parent.code === '23505') {
