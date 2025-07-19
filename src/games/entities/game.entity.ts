@@ -8,7 +8,10 @@ import {
 import { GamePlayer } from './game-player.entity';
 import { User } from 'src/users/entities/user.entity';
 
-@Table
+@Table({
+  tableName: 'games',
+  timestamps: true,
+})
 export class Game extends Model {
   @Column({
     type: DataType.STRING,

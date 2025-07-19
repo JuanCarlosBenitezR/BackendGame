@@ -10,6 +10,11 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectModel } from '@nestjs/sequelize';
 import { User } from './entities/user.entity';
 import { Game } from 'src/games/entities/game.entity';
+import * as bcrypt from 'bcrypt';
+import { UserRole } from './interfaces/user-role.interface';
+import { LoginUserDto } from './dto/login-user.dto';
+import { JwtPayload } from './jwt-payload.interface';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class UsersService {
@@ -17,20 +22,54 @@ export class UsersService {
   constructor(
     @InjectModel(User)
     private userModel: typeof User,
+
+    private readonly jwtService: JwtService,
   ) {}
 
   async create(createUserDto: CreateUserDto) {
-    const { fullname, email } = createUserDto;
+    const { fullname, email, password } = createUserDto;
     try {
       const newUser = await this.userModel.create({
         fullname: fullname,
         email: email,
+        password: bcrypt.hashSync(password, 12),
+        rol: [UserRole.PLAYER], // Default role for new users
         isActive: true,
       });
-      return newUser;
+      return {
+        message: 'User created successfully',
+        user: {
+          id: newUser.id,
+          fullname: newUser.dataValues.fullname,
+          email: newUser.dataValues.email,
+        },
+      };
     } catch (error) {
       this.handleDBException(error);
     }
+  }
+
+  async login(loginUserDto: LoginUserDto) {
+    const { email, password } = loginUserDto;
+    const user = await this.userModel.findOne({
+      where: {
+        email: email,
+        isActive: true,
+      },
+    });
+
+    if (!user || !bcrypt.compareSync(password, user.dataValues.password)) {
+      throw new BadRequestException('Invalid credentials');
+    }
+
+    return {
+      token: this.getJwtToken({ id: user.dataValues.id }),
+      user: {
+        id: user.dataValues.id,
+        fullname: user.dataValues.fullname,
+        email: user.dataValues.email,
+      },
+    };
   }
 
   findAll() {
@@ -91,6 +130,9 @@ export class UsersService {
     } catch (error) {
       this.handleDBException(error);
     }
+  }
+  private getJwtToken(payload: JwtPayload) {
+    return this.jwtService.sign(payload);
   }
 
   private handleDBException(error: any) {
